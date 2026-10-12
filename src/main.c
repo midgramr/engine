@@ -1,198 +1,114 @@
-/*******************************************************************************************
- *
- *   raylib [shapes] example - drag puzzle
- *
- *   Example complexity rating: [★☆☆☆] 1/4
- *
- *   Example originally created with raylib 6.0, last time updated with
- * raylib 6.0
- *
- *   Example contributed by Gabriel Piangers (@gabriel-piangers) and reviewed by
- * Ramon Santamaria (@raysan5)
- *
- *   Example licensed under an unmodified zlib/libpng license, which is an
- * OSI-certified, BSD-like license that allows static linking with closed source
- * software
- *
- *   Copyright (c) 2026 Gabriel Piangers (@gabriel-piangers)
- *
- ********************************************************************************************/
-
 #include "raylib.h"
-#include "raymath.h"
+#include "resource_dir.h" // utility header for SearchAndSetResourceDir
 
-#define max(a, b) (a) > (b) ? (a) : (b)
-#define min(a, b) (a) < (b) ? (a) : (b)
+#define LIGHT (Color){230, 203, 165, 255}
+#define DARK (Color){179, 108, 63, 255}
 
-//----------------------------------------------------------------------------------
-// Types and Structures Definition
-//----------------------------------------------------------------------------------
-typedef struct {
-  Vector2 center;
-  float radius;
-} Circle;
+#define N_ROWS 8
+#define N_COLS 8
 
-typedef struct {
-  Vector2 v1;
-  Vector2 v2;
-  Vector2 v3;
-} Triangle;
+typedef enum {
+  PAWN_WHITE,
+  KNIGHT_WHITE,
+  BISHOP_WHITE,
+  ROOK_WHITE,
+  QUEEN_WHITE,
+  KING_WHITE,
+  PAWN_BLACK,
+  KNIGHT_BLACK,
+  BISHOP_BLACK,
+  ROOK_BLACK,
+  QUEEN_BLACK,
+  KING_BLACK,
+  N_PIECE_TYPES
+} Piece;
 
-//------------------------------------------------------------------------------------
-// Program main entry point
-//------------------------------------------------------------------------------------
-int main(void) {
-  // Initialization
-  //--------------------------------------------------------------------------------------
-  const int screenWidth = 800;
-  const int screenHeight = 450;
+Texture2D pieces[N_PIECE_TYPES];
+const float borderWidth = 50, borderHeight = 50, squareSide = 100;
 
-  InitWindow(screenWidth, screenHeight,
-             "raylib [shapes] example - drag puzzle");
+void drawPiece(Piece type, int row, int col) {
+  DrawTextureEx(pieces[type],
+                (Vector2){borderWidth + col * squareSide,
+                          borderHeight + row * squareSide},
+                0.0f, 0.1f, WHITE);
+}
 
-  // Rectangle
-  Rectangle rec = {screenWidth / 2 - 250, screenHeight / 2 + 50, 100.0f,
-                   100.0f};
-  Rectangle recArea = {screenWidth / 2 - 60, screenHeight / 2 - 110, 110.0f,
-                       110.0f};
-  bool recPickedUp = false;
+int main() {
+  // Tell the window to use vsync and work on high DPI displays
+  SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
 
-  // Circle
-  Circle circ = {screenWidth / 2, screenHeight / 2 + 100, 50.0f};
-  Circle circArea = {screenWidth / 2 - 195, screenHeight / 2 - 55, 55.0f};
-  bool circPickedUp = false;
+  // Create the window and OpenGL context
+  InitWindow(900, 900, "Hello Raylib");
 
-  // Triangle
-  Triangle tri = {{600, 282}, {550, 369}, {650, 369}};
-  Triangle triArea = {{600, 115}, {540, 222}, {660, 222}};
-  bool triPickedUp = false;
+  // Utility function from resource_dir.h to find the resources folder and set
+  // it as the current working directory so we can load from it
+  SearchAndSetResourceDir("resources");
 
-  Vector2 mouseOffset = {0.0f, 0.0f}; // Stores the offset of the mouse relative
-                                      // to the object's pivot point
+  pieces[PAWN_WHITE] = LoadTexture("pawn-white.png");
+  pieces[KNIGHT_WHITE] = LoadTexture("knight-white.png");
+  pieces[BISHOP_WHITE] = LoadTexture("bishop-white.png");
+  pieces[ROOK_WHITE] = LoadTexture("rook-white.png");
+  pieces[QUEEN_WHITE] = LoadTexture("queen-white.png");
+  pieces[KING_WHITE] = LoadTexture("king-white.png");
+  pieces[PAWN_BLACK] = LoadTexture("pawn-black.png");
+  pieces[KNIGHT_BLACK] = LoadTexture("knight-black.png");
+  pieces[BISHOP_BLACK] = LoadTexture("bishop-black.png");
+  pieces[ROOK_BLACK] = LoadTexture("rook-black.png");
+  pieces[QUEEN_BLACK] = LoadTexture("queen-black.png");
+  pieces[KING_BLACK] = LoadTexture("king-black.png");
 
-  SetTargetFPS(60);
-  //--------------------------------------------------------------------------------------
-
-  // Main game loop
-  while (!WindowShouldClose()) // Detect window close button or ESC key
-  {
-    // Update
-    //----------------------------------------------------------------------------------
-    Vector2 mousePosition = GetMousePosition();
-    bool recPlaced = false;
-    bool circPlaced = false;
-    bool triPlaced = false;
-
-    // Detect object pickup input
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-        CheckCollisionPointRec(mousePosition, rec)) {
-      recPickedUp = true;
-      mouseOffset = (Vector2){rec.x - mousePosition.x, rec.y - mousePosition.y};
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-               CheckCollisionPointCircle(mousePosition, circ.center,
-                                         circ.radius)) {
-      circPickedUp = true;
-      mouseOffset = (Vector2){circ.center.x - mousePosition.x,
-                              circ.center.y - mousePosition.y};
-    } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-               CheckCollisionPointTriangle(mousePosition, tri.v1, tri.v2,
-                                           tri.v3)) {
-      triPickedUp = true;
-      mouseOffset =
-          (Vector2){tri.v1.x - mousePosition.x,
-                    tri.v1.y - mousePosition.y}; // Uses v1 as the pivot point
-    }
-
-    // Detect object drop input
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && recPickedUp)
-      recPickedUp = false;
-    else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && circPickedUp)
-      circPickedUp = false;
-    else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && triPickedUp)
-      triPickedUp = false;
-
-    // Rectangle update
-    if (recPickedUp) {
-      rec.x = min(max(0, mousePosition.x - rec.width / 2), screenWidth - rec.width);
-      rec.y = min(max(0, mousePosition.y - rec.height / 2), screenHeight - rec.height);
-      if (CheckCollisionPointRec(mousePosition, recArea)) {
-        recPlaced = true;
-      }
-    } else {
-      if (CheckCollisionPointRec(mousePosition, recArea)) {
-        rec.x = recArea.x + (recArea.width - rec.width) / 2;
-        rec.y = recArea.y + (recArea.height - rec.height) / 2;
-      }
-    }
-    // Rectangle RecCol = GetCollisionRec(recArea, rec);
-    // if (RecCol.width == rec.width && RecCol.height == rec.height)
-    //   recPlaced = true;
-
-    // Circle update
-    if (circPickedUp) {
-      circ.center.x = mousePosition.x;
-      circ.center.y = mousePosition.y;
-    }
-    if (Vector2Distance(circ.center, circArea.center) <
-        circArea.radius - circ.radius)
-      circPlaced = true;
-
-    // Triangle update
-    if (triPickedUp) {
-      Vector2 v2Offset = {tri.v2.x - tri.v1.x, tri.v2.y - tri.v1.y};
-      Vector2 v3Offset = {tri.v3.x - tri.v1.x, tri.v3.y - tri.v1.y};
-
-      tri.v1 = (Vector2){mousePosition.x + mouseOffset.x,
-                         mousePosition.y + mouseOffset.y};
-      tri.v2 = (Vector2){tri.v1.x + v2Offset.x, tri.v1.y + v2Offset.y};
-      tri.v3 = (Vector2){tri.v1.x + v3Offset.x, tri.v1.y + v3Offset.y};
-    }
-    if (CheckCollisionPointTriangle(tri.v1, triArea.v1, triArea.v2,
-                                    triArea.v3) &&
-        CheckCollisionPointTriangle(tri.v2, triArea.v1, triArea.v2,
-                                    triArea.v3) &&
-        CheckCollisionPointTriangle(tri.v2, triArea.v1, triArea.v2, triArea.v3))
-      triPlaced = true;
-    //----------------------------------------------------------------------------------
-
-    // Draw
-    //----------------------------------------------------------------------------------
+  while (!WindowShouldClose()) {
+    // drawing
     BeginDrawing();
 
-    ClearBackground(RAYWHITE);
+    // Setup the back buffer for drawing (clear color and depth buffers)
+    ClearBackground(WHITE);
 
-    DrawRectangleLinesEx(recArea, 2.0f, recPlaced ? GREEN : RED);
-    DrawCircleLinesEx(circArea.center, circArea.radius, 2.0f,
-                      circPlaced ? GREEN : RED);
-    DrawTriangleLinesEx(triArea.v1, triArea.v2, triArea.v3, 2.0f,
-                        triPlaced ? GREEN : RED);
+    // Draw chess board
+    for (int row = 0; row < N_ROWS; ++row) {
+      for (int col = 0; col < N_COLS; ++col) {
+        DrawRectangleRec((Rectangle){borderWidth + row * squareSide,
+                                     borderHeight + col * squareSide,
+                                     squareSide, squareSide},
+                         (row + col) % 2 == 0 ? LIGHT : DARK);
+      }
+    }
 
-    // Draws objects that are not picked up first
-    if (!triPickedUp)
-      DrawTriangle(tri.v1, tri.v2, tri.v3, VIOLET);
-    if (!circPickedUp)
-      DrawCircleV(circ.center, circ.radius, BLUE);
-    if (!recPickedUp)
-      DrawRectangleRec(rec, ORANGE);
+    // Draw pieces
+    drawPiece(ROOK_BLACK, 0, 0);
+    drawPiece(KNIGHT_BLACK, 0, 1);
+    drawPiece(BISHOP_BLACK, 0, 2);
+    drawPiece(QUEEN_BLACK, 0, 3);
+    drawPiece(KING_BLACK, 0, 4);
+    drawPiece(BISHOP_BLACK, 0, 5);
+    drawPiece(KNIGHT_BLACK, 0, 6);
+    drawPiece(ROOK_BLACK, 0, 7);
+    for (int col = 0; col < N_COLS; ++col) {
+      drawPiece(PAWN_BLACK, 1, col);
+    }
 
-    // Draws the object that is being dragged on top of others
-    if (triPickedUp)
-      DrawTriangle(tri.v1, tri.v2, tri.v3, VIOLET);
-    if (circPickedUp)
-      DrawCircleV(circ.center, circ.radius, BLUE);
-    if (recPickedUp)
-      DrawRectangleRec(rec, ORANGE);
+    drawPiece(ROOK_WHITE, 7, 0);
+    drawPiece(KNIGHT_WHITE, 7, 1);
+    drawPiece(BISHOP_WHITE, 7, 2);
+    drawPiece(QUEEN_WHITE, 7, 3);
+    drawPiece(KING_WHITE, 7, 4);
+    drawPiece(BISHOP_WHITE, 7, 5);
+    drawPiece(KNIGHT_WHITE, 7, 6);
+    drawPiece(ROOK_WHITE, 7, 7);
+    for (int col = 0; col < N_COLS; ++col) {
+      drawPiece(PAWN_WHITE, 6, col);
+    }
 
-    DrawText("Use mouse to drag and drop the objects into the right spot!", 10,
-             10, 20, GRAY);
+    // end the frame and get ready for the next one  (display frame, poll input,
+    // etc...)
     EndDrawing();
-    //----------------------------------------------------------------------------------
   }
 
-  // De-Initialization
-  //--------------------------------------------------------------------------------------
-  CloseWindow(); // Close window and OpenGL context
-  //--------------------------------------------------------------------------------------
+  for (int i = 0; i < N_PIECE_TYPES; ++i) {
+    UnloadTexture(pieces[i]);
+  }
 
+  // destroy the window and cleanup the OpenGL context
+  CloseWindow();
   return 0;
 }
